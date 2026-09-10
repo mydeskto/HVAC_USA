@@ -1,0 +1,9 @@
+services:
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: addisonairsolution
+    ports:
+      - "80:80"
+    restart: unless-stopped

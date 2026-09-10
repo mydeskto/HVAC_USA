@@ -1,0 +1,6 @@
+addisonairsolution.com, www.addisonairsolution.com {
+    root * /srv
+    try_files {path} {path}/ /index.html
+    file_server
+    encode gzip
+}

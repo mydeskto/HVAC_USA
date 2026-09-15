@@ -32,7 +32,7 @@ services:
 
     environment:
       # PostgreSQL
-      DATABASE_URL: postgresql://postgres:2769@host.docker.internal:5432/nplt20league
+      DATABASE_URL: postgresql://77OAkZgYHpPksq9w:GLvyIA4UW5t8EcyZRCygX0Be2VMZ1KsX@2.25.182.128:32768/Z1FFViK4NzS7DVdI
       DATABASE_SSL: "false"
 
       # HTTP server

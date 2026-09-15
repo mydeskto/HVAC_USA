@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: addisonairsolution
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     restart: unless-stopped
     depends_on:
       - api

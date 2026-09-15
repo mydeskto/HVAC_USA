@@ -1,0 +1,10 @@
+.git
+**/.next
+**/node_modules
+**/out
+**/dist
+**/uploads
+**/.env
+**/.env.*
+**/*.log
+**/.DS_Store

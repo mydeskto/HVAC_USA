@@ -1,6 +1,21 @@
 addisonairsolution.com, www.addisonairsolution.com {
-    root * /srv
-    try_files {path} {path}/ /index.html
-    file_server
     encode gzip
+
+    handle /api/* {
+        reverse_proxy api:3001
+    }
+
+    handle /uploads/* {
+        reverse_proxy api:3001
+    }
+
+    handle /health {
+        reverse_proxy api:3001
+    }
+
+    handle {
+        root * /srv
+        try_files {path} {path}/ /index.html
+        file_server
+    }
 }

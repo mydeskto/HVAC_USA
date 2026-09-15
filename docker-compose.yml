@@ -32,13 +32,13 @@ services:
       # HTTP server
       NODE_ENV: production
       PORT: "3001"
-      FRONTEND_ORIGINS: https://nplt20league.com,https://addisonairsolution.com,https://www.addisonairsolution.com
+      FRONTEND_ORIGINS: https://nplt20league.com,https://addisonairsolution.com,https://www.addisonairsolution.com,http://localhost:3000,http://127.0.0.1:3000
       TRUST_PROXY: "true"
 
       # Admin session (maximum supported lifetime is 24 hours)
       SESSION_COOKIE_NAME: npl_admin_session
       SESSION_TTL_HOURS: "24"
-      COOKIE_SAME_SITE: lax
+      COOKIE_SAME_SITE: none
       COOKIE_DOMAIN: ""
 
       # Uploaded media storage

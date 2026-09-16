@@ -6,8 +6,9 @@ import { notFound } from "../utils/app-error.js";
 
 type MatchInput = typeof matches.$inferInsert & { participants: Array<Omit<typeof matchTeams.$inferInsert, "matchId">> };
 
-function withStoredLogos<T extends { logoUrl?: string | null }>(participant: T): T {
-  return participant.logoUrl === undefined ? participant : { ...participant, logoUrl: toPublicMediaUrl(participant.logoUrl) };
+function withStoredLogos<T extends { logoUrl?: string | null | undefined }>(participant: T): T {
+  if (participant.logoUrl === undefined) return participant;
+  return { ...participant, logoUrl: toPublicMediaUrl(participant.logoUrl) };
 }
 
 export async function listMatches(year?: number) {

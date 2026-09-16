@@ -4,8 +4,9 @@ import { seasons, stats } from "../db/schema/index.js";
 import { toPublicMediaUrl, withPublicMediaUrls } from "./media.service.js";
 import { notFound } from "../utils/app-error.js";
 
-function withStoredImage<T extends { imageUrl?: string | null }>(input: T): T {
-  return input.imageUrl === undefined ? input : { ...input, imageUrl: toPublicMediaUrl(input.imageUrl) };
+function withStoredImage<T extends { imageUrl?: string | null | undefined }>(input: T): T {
+  if (input.imageUrl === undefined) return input;
+  return { ...input, imageUrl: toPublicMediaUrl(input.imageUrl) };
 }
 
 export async function listStats(year?: number, category?: typeof stats.$inferSelect.category) {

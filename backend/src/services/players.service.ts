@@ -34,8 +34,9 @@ function sanitizeProfileValue(value: unknown, key?: string): unknown {
   return value;
 }
 
-function withStoredPlayerMedia<T extends { imageUrl?: string | null }>(record: T): T {
-  return record.imageUrl === undefined ? record : { ...record, imageUrl: toPublicMediaUrl(record.imageUrl) };
+function withStoredPlayerMedia<T extends { imageUrl?: string | null | undefined }>(record: T): T {
+  if (record.imageUrl === undefined) return record;
+  return { ...record, imageUrl: toPublicMediaUrl(record.imageUrl) };
 }
 
 function uniqueAliases(aliases: string[] | undefined, canonicalSlug: string | undefined) {

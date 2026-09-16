@@ -24,10 +24,39 @@ export function mediaMountPath(): string {
   return normalized === "/" ? "/uploads" : normalized;
 }
 
+export function publicSiteOrigin(): string {
+  const configured = env.PUBLIC_SITE_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (/^https?:\/\//i.test(env.PUBLIC_MEDIA_BASE_URL)) return new URL(env.PUBLIC_MEDIA_BASE_URL).origin;
+  return env.frontendOrigins.find((origin) => /^https:\/\//i.test(origin) && !/localhost|127\.0\.0\.1/i.test(origin)) ?? "";
+}
+
+export function toPublicMediaUrl<T extends string | null | undefined>(value: T): T {
+  if (value == null) return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  if (/^(https?:\/\/|data:|blob:)/i.test(trimmed)) return trimmed as T;
+  const origin = publicSiteOrigin();
+  const stripped = trimmed.replace(/^(?:\.\.\/)+/, "").replace(/^\/+/, "");
+  const mount = mediaMountPath().replace(/^\/+/, "");
+  const path = stripped.startsWith(`${mount}/`) || stripped === mount ? `/${stripped}` : `/${mount}/${stripped}`;
+  return (origin ? `${origin}${path}` : path) as T;
+}
+
 function publicUrl(filename: string): string {
-  // Keep filenames readable in URLs; hyphens/dots do not need encoding.
-  const base = env.PUBLIC_MEDIA_BASE_URL.replace(/\/$/, "")
-  return `${base}/${filename}`
+  return toPublicMediaUrl(`${mediaMountPath()}/${filename}`);
+}
+
+const MEDIA_URL_KEYS = new Set(["imageUrl", "logoUrl", "image", "logo", "teamLogoUrl"]);
+
+export function withPublicMediaUrls<T>(value: T): T {
+  if (value == null || typeof value !== "object") return value;
+  if (value instanceof Date) return value;
+  if (Array.isArray(value)) return value.map((item) => withPublicMediaUrls(item)) as T;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+    if (MEDIA_URL_KEYS.has(key) && (typeof item === "string" || item == null)) return [key, toPublicMediaUrl(item as string | null)];
+    return [key, withPublicMediaUrls(item)];
+  })) as T;
 }
 
 function safeStem(filename: string | undefined): string {

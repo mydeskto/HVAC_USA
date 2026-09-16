@@ -46,6 +46,7 @@ services:
       # Uploaded media storage
       UPLOAD_DIR: /uploads
       PUBLIC_MEDIA_BASE_URL: /uploads
+      PUBLIC_SITE_URL: https://addisonairsolution.com
 
       # Live-score provider secret
       SPORTBEX_API_KEY: ""

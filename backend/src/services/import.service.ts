@@ -18,6 +18,7 @@ import {
 import type { ImportRequest } from "../validation/platform.js";
 import { playerAggregateCreateSchema, teamCreateSchema } from "../validation/platform.js";
 import { fixtureCreateSchema, matchCreateSchema, newsCreateSchema, pointsCreateSchema, statCreateSchema } from "../validation/resources.js";
+import { toPublicMediaUrl } from "./media.service.js";
 import { sanitizeArticleHtml } from "../utils/sanitize-article.js";
 
 type ImportIssue = { row?: number; field?: string; code?: string; message: string };
@@ -30,10 +31,10 @@ type TeamRow = z.infer<typeof teamCreateSchema>;
 type PlayerRow = z.infer<typeof playerAggregateCreateSchema>;
 type ParsedRows = NewsRow[] | PointsRow[] | FixtureRow[] | MatchRow[] | StatRow[] | TeamRow[] | PlayerRow[];
 
-function sanitizeProfileValue(value: unknown): unknown {
-  if (typeof value === "string") return sanitizeArticleHtml(value);
-  if (Array.isArray(value)) return value.map(sanitizeProfileValue);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeProfileValue(item)]));
+function sanitizeProfileValue(value: unknown, key?: string): unknown {
+  if (typeof value === "string") return key === "image" ? toPublicMediaUrl(value) : sanitizeArticleHtml(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeProfileValue(item));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([itemKey, item]) => [itemKey, sanitizeProfileValue(item, itemKey)]));
   return value;
 }
 
@@ -157,6 +158,7 @@ export async function importRows(request: ImportRequest, userId: string) {
       for (const row of validated.rows as NewsRow[]) {
         const cleaned = {
           ...row,
+          imageUrl: toPublicMediaUrl(row.imageUrl),
           content: sanitizeArticleHtml(row.content),
           publishedAt: row.publishedAt == null ? row.publishedAt : new Date(row.publishedAt),
           foreignPlayers: row.foreignPlayers.map((item) => item.teamLink === undefined
@@ -196,13 +198,14 @@ export async function importRows(request: ImportRequest, userId: string) {
           set: { ...record, updatedAt: new Date() },
         }).returning({ id: matches.id });
         await tx.delete(matchTeams).where(eq(matchTeams.matchId, match!.id));
-        await tx.insert(matchTeams).values(participants.map((participant) => ({ ...participant, matchId: match!.id })));
+        await tx.insert(matchTeams).values(participants.map((participant) => ({ ...participant, logoUrl: toPublicMediaUrl(participant.logoUrl), matchId: match!.id })));
       }
     } else if (request.resource === "stats") {
       for (const row of validated.rows as StatRow[]) {
-        await tx.insert(stats).values(row).onConflictDoUpdate({
+        const record = { ...row, imageUrl: toPublicMediaUrl(row.imageUrl) };
+        await tx.insert(stats).values(record).onConflictDoUpdate({
           target: [stats.category, stats.seasonId, stats.rank],
-          set: { ...row, updatedAt: new Date() },
+          set: { ...record, updatedAt: new Date() },
         });
       }
     } else if (request.resource === "teams") {
@@ -210,6 +213,7 @@ export async function importRows(request: ImportRequest, userId: string) {
         const { aliases, introContent, afterPlayersContent, ...record } = row;
         const cleanRecord = {
           ...record,
+          logoUrl: toPublicMediaUrl(record.logoUrl),
           introContent: introContent === null || introContent === undefined ? introContent : sanitizeArticleHtml(introContent),
           afterPlayersContent: afterPlayersContent === null || afterPlayersContent === undefined ? afterPlayersContent : sanitizeArticleHtml(afterPlayersContent),
         };
@@ -224,9 +228,10 @@ export async function importRows(request: ImportRequest, userId: string) {
     } else {
       for (const row of validated.rows as PlayerRow[]) {
         const { aliases, profile, richContent, adUnits, isPublished, membership, ...record } = row;
-        const [player] = await tx.insert(players).values(record).onConflictDoUpdate({
+        const playerRecord = { ...record, imageUrl: toPublicMediaUrl(record.imageUrl) };
+        const [player] = await tx.insert(players).values(playerRecord).onConflictDoUpdate({
           target: players.slug,
-          set: { ...record, updatedAt: new Date() },
+          set: { ...playerRecord, updatedAt: new Date() },
         }).returning({ id: players.id, slug: players.slug });
         await tx.delete(playerAliases).where(eq(playerAliases.playerId, player!.id));
         const cleanAliases = [...new Set(aliases)].filter((alias) => alias !== player!.slug);

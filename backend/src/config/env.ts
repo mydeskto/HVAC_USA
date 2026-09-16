@@ -19,6 +19,7 @@ const envSchema = z.object({
   COOKIE_DOMAIN: z.string().optional(),
   UPLOAD_DIR: z.string().min(1).default("./uploads"),
   PUBLIC_MEDIA_BASE_URL: z.string().min(1).default("/uploads"),
+  PUBLIC_SITE_URL: z.string().trim().optional().transform((value) => value || undefined),
   SPORTBEX_API_KEY: z.string().optional(),
 });
 

@@ -1,13 +1,14 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { pointsTable, seasons, teams } from "../db/schema/index.js";
+import { withPublicMediaUrls } from "./media.service.js";
 import { notFound } from "../utils/app-error.js";
 
 export async function listPoints(year?: number) {
   const rows = await db.select({ id: pointsTable.id, seasonId: pointsTable.seasonId, year: seasons.year, teamId: pointsTable.teamId, team: teams.name, logo: teams.logoUrl, position: pointsTable.position, matches: pointsTable.matches, won: pointsTable.won, lost: pointsTable.lost, tied: pointsTable.tied, noResult: pointsTable.noResult, netRunRate: pointsTable.netRunRate, points: pointsTable.points, updatedAt: pointsTable.updatedAt })
     .from(pointsTable).innerJoin(seasons, eq(pointsTable.seasonId, seasons.id)).innerJoin(teams, eq(pointsTable.teamId, teams.id))
     .where(year ? eq(seasons.year, year) : undefined).orderBy(asc(seasons.year), asc(pointsTable.position));
-  return rows;
+  return withPublicMediaUrls(rows);
 }
 
 export async function createPoint(input: typeof pointsTable.$inferInsert) {

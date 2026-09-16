@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { playerAliases, playerProfiles, players, seasons, teamAliases, teamMemberships, teams } from "../db/schema/index.js";
 import type { PlayerAggregateInput } from "../validation/platform.js";
+import { toPublicMediaUrl, withPublicMediaUrls } from "./media.service.js";
 import { notFound } from "../utils/app-error.js";
 import { sanitizeArticleHtml } from "../utils/sanitize-article.js";
 
@@ -24,13 +25,17 @@ type MembershipRow = {
   sortOrder: number;
 };
 
-function sanitizeProfileValue(value: unknown): unknown {
-  if (typeof value === "string") return sanitizeArticleHtml(value);
-  if (Array.isArray(value)) return value.map(sanitizeProfileValue);
+function sanitizeProfileValue(value: unknown, key?: string): unknown {
+  if (typeof value === "string") return key === "image" ? toPublicMediaUrl(value) : sanitizeArticleHtml(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeProfileValue(item));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeProfileValue(item)]));
+    return Object.fromEntries(Object.entries(value).map(([itemKey, item]) => [itemKey, sanitizeProfileValue(item, itemKey)]));
   }
   return value;
+}
+
+function withStoredPlayerMedia<T extends { imageUrl?: string | null }>(record: T): T {
+  return record.imageUrl === undefined ? record : { ...record, imageUrl: toPublicMediaUrl(record.imageUrl) };
 }
 
 function uniqueAliases(aliases: string[] | undefined, canonicalSlug: string | undefined) {
@@ -93,7 +98,7 @@ async function loadAdminPlayers(ids?: string[]) {
     playerIds.length ? db.select().from(playerAliases).where(inArray(playerAliases.playerId, playerIds)).orderBy(asc(playerAliases.alias)) : [],
     loadMemberships(playerIds),
   ]);
-  return rows.map(({ player, profile }) => ({
+  return withPublicMediaUrls(rows.map(({ player, profile }) => ({
     ...player,
     profile: profile?.profileData ?? null,
     richContent: profile?.richContent ?? null,
@@ -101,7 +106,7 @@ async function loadAdminPlayers(ids?: string[]) {
     isPublished: profile?.isPublished ?? false,
     aliases: aliases.filter((alias) => alias.playerId === player.id).map((alias) => alias.alias),
     membership: adminMembership(memberships.find((membership) => membership.playerId === player.id)),
-  }));
+  })));
 }
 
 export async function listAdminPlayers() {
@@ -117,7 +122,7 @@ export async function getAdminPlayer(id: string) {
 export async function createPlayer(input: PlayerInput) {
   const id = await db.transaction(async (tx) => {
     const { aliases, profile, richContent, adUnits, isPublished, membership, ...record } = input;
-    const [created] = await tx.insert(players).values(record).returning({ id: players.id, slug: players.slug });
+    const [created] = await tx.insert(players).values(withStoredPlayerMedia(record)).returning({ id: players.id, slug: players.slug });
     const cleanAliases = uniqueAliases(aliases, created!.slug) ?? [];
     if (cleanAliases.length) await tx.insert(playerAliases).values(cleanAliases.map((alias) => ({ playerId: created!.id, alias })));
     if (profile !== null && (profile !== undefined || richContent !== undefined || adUnits.length > 0 || isPublished)) {
@@ -138,7 +143,7 @@ export async function createPlayer(input: PlayerInput) {
 export async function updatePlayer(id: string, input: Partial<PlayerInput>) {
   await db.transaction(async (tx) => {
     const { aliases, profile, richContent, adUnits, isPublished, membership, ...record } = input;
-    const [updated] = await tx.update(players).set({ ...record, updatedAt: new Date() }).where(eq(players.id, id)).returning({ slug: players.slug });
+    const [updated] = await tx.update(players).set({ ...withStoredPlayerMedia(record), updatedAt: new Date() }).where(eq(players.id, id)).returning({ slug: players.slug });
     if (!updated) notFound("Player");
 
     if (aliases !== undefined) {
@@ -208,7 +213,7 @@ export async function listPublicPlayers(options: { team?: string; year?: number;
     const playerAliasRows = aliases.filter((alias) => alias.playerId === player.id).map((alias) => alias.alias);
     if (query && ![player.name, player.slug, ...playerAliasRows].some((value) => value.toLocaleLowerCase().includes(query))) return [];
     const profileData = profile.profileData as Record<string, unknown>;
-    return [{
+    return [withPublicMediaUrls({
       ...player,
       profile: profileData,
       richContent: profile.richContent,
@@ -221,7 +226,7 @@ export async function listPublicPlayers(options: { team?: string; year?: number;
       team: selected?.teamName,
       teamSlug: selected?.teamSlug,
       status: selected?.status,
-    }];
+    })];
   });
 }
 

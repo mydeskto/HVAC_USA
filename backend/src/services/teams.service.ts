@@ -2,12 +2,14 @@ import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { playerProfiles, players, seasons, teamAliases, teamMemberships, teams } from "../db/schema/index.js";
 import type { TeamInput } from "../validation/platform.js";
+import { toPublicMediaUrl, withPublicMediaUrls } from "./media.service.js";
 import { notFound } from "../utils/app-error.js";
 import { sanitizeArticleHtml } from "../utils/sanitize-article.js";
 
 function cleanTeam<T extends Partial<TeamInput>>(input: T): T {
   return {
     ...input,
+    ...(input.logoUrl !== undefined ? { logoUrl: toPublicMediaUrl(input.logoUrl) } : {}),
     ...(input.introContent !== undefined
       ? { introContent: input.introContent === null ? null : sanitizeArticleHtml(input.introContent) }
       : {}),
@@ -27,7 +29,7 @@ export async function listTeams(includeInactive = false) {
     .where(includeInactive ? undefined : eq(teams.isActive, true))
     .orderBy(asc(teams.name));
   const aliases = await aliasesFor(rows.map((row) => row.id));
-  return rows.map((row) => ({ ...row, aliases: aliases.filter((alias) => alias.teamId === row.id).map((alias) => alias.alias) }));
+  return withPublicMediaUrls(rows.map((row) => ({ ...row, aliases: aliases.filter((alias) => alias.teamId === row.id).map((alias) => alias.alias) })));
 }
 
 async function resolveTeam(slugOrAlias: string, includeInactive: boolean) {
@@ -77,7 +79,7 @@ export async function getTeamBySlug(slugOrAlias: string, includeInactive = false
   const roster = selectedYear === undefined
     ? []
     : membershipRows.filter((row) => row.seasonYear === selectedYear).map(({ isPublished: _isPublished, sortOrder: _sortOrder, ...row }) => row);
-  return { ...team, aliases: aliases.map((alias) => alias.alias), roster };
+  return withPublicMediaUrls({ ...team, aliases: aliases.map((alias) => alias.alias), roster });
 }
 
 export async function createTeam(input: TeamInput) {
@@ -85,7 +87,7 @@ export async function createTeam(input: TeamInput) {
     const { aliases, ...record } = cleanTeam(input);
     const [created] = await tx.insert(teams).values(record).returning();
     if (aliases.length) await tx.insert(teamAliases).values(aliases.map((alias) => ({ teamId: created!.id, alias })));
-    return { ...created!, aliases };
+    return withPublicMediaUrls({ ...created!, aliases });
   });
 }
 
@@ -100,7 +102,7 @@ export async function updateTeam(id: string, input: Partial<TeamInput>) {
       if (aliases.length) await tx.insert(teamAliases).values(aliases.map((alias) => ({ teamId: id, alias })));
     }
     const currentAliases = await tx.select().from(teamAliases).where(eq(teamAliases.teamId, id)).orderBy(asc(teamAliases.alias));
-    return { ...updated, aliases: currentAliases.map((alias) => alias.alias) };
+    return withPublicMediaUrls({ ...updated, aliases: currentAliases.map((alias) => alias.alias) });
   });
 }
 
